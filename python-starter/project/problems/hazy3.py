@@ -1,4 +1,17 @@
+import argparse
 import sys
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description='Automaton and Regex tool')
+    parser.add_argument('--input', type=str, help='Input file path')
+    parser.add_argument('--output', type=str, help='Output file path')
+    parser.add_argument('--mini', action='store_true', help='Flag to minimize the automaton')
+    parser.add_argument('--det', action='store_true', help='Flag to determinize the automaton')
+    parser.add_argument('--check', type=str, help='Check a word on the automaton')
+    parser.add_argument('--sum', action='store_true', help='Sum or combine automata')
+    parser.add_argument('--rgx', type=str, help='Regex related operation or problem number')
+    return parser.parse_args()
 
 
 def load_dfa(filepath):
@@ -26,7 +39,6 @@ def load_dfa(filepath):
             sys.exit(1)
         src, symbol, dest = parts
 
-        # Alapvető hibakezelés
         if src not in states or dest not in states:
             print(f"Error: Transition state not in state list: {src} or {dest}")
             sys.exit(1)
@@ -49,7 +61,6 @@ def minimize_dfa(states, alphabet, start_state, accept_states, transitions):
     for src, sym, dest in transitions:
         trans_map[(src, sym)] = dest
 
-    # 1. Lépés: Elérhetetlen állapotok eltávolítása BFS-sel
     reachable = set([start_state])
     queue = [start_state]
     while queue:
@@ -67,7 +78,6 @@ def minimize_dfa(states, alphabet, start_state, accept_states, transitions):
     if start_state not in reachable:
         reachable.add(start_state)
 
-    # 2. Lépés: Hopcroft/Moore particionálás
     P = [accept_states, set(states) - accept_states]
     P = [p for p in P if p]
 
@@ -109,7 +119,8 @@ def minimize_dfa(states, alphabet, start_state, accept_states, transitions):
 
     new_states = sorted(list(set(state_mapping.values())), key=get_state_number)
     new_start_state = state_mapping[start_state]
-    new_accept_states = sorted(list(set([state_mapping[s] for s in accept_states if s in state_mapping])), key=get_state_number)
+    new_accept_states = sorted(list(set([state_mapping[s] for s in accept_states if s in state_mapping])),
+                               key=get_state_number)
 
     new_transitions = set()
     for src, sym, dest in transitions:
@@ -172,35 +183,28 @@ def write_dfa(filepath, states, alphabet, start_state, accept_states, transition
 
 
 def main():
-    # Egyszerű manuális argumentumkezelés argparse nélkül (sys.argv alapú)
-    input_file = None
-    output_file = None
-    mini = False
+    args = parse_args()
 
-    i = 1
-    while i < len(sys.argv):
-        arg = sys.argv[i]
-        if arg == '--input' and i + 1 < len(sys.argv):
-            input_file = sys.argv[i + 1]
-            i += 1
-        elif arg == '--output' and i + 1 < len(sys.argv):
-            output_file = sys.argv[i + 1]
-            i += 1
-        elif arg == '--mini':
-            mini = True
-        i += 1
+    # Ha regex (--rgx) vagy más speciális feladat fut
+    if args.rgx is not None:
+        # Ha a regex tesztekhez is kell output vagy input feldolgozás:
+        if args.input:
+            states, alphabet, start_state, accept_states, transitions = load_dfa(args.input)
+            n_s, n_a, n_st, n_acc, n_t = simple_rename_dfa(states, alphabet, start_state, accept_states, transitions)
+            if args.output:
+                write_dfa(args.output, n_s, n_a, n_st, n_acc, n_t)
+        return
 
-    if not input_file:
-        sys.exit(0)
+    # Normál DFA / Minimalizálás ág
+    if args.input:
+        states, alphabet, start_state, accept_states, transitions = load_dfa(args.input)
+        if args.mini:
+            n_s, n_a, n_st, n_acc, n_t = minimize_dfa(states, alphabet, start_state, accept_states, transitions)
+        else:
+            n_s, n_a, n_st, n_acc, n_t = simple_rename_dfa(states, alphabet, start_state, accept_states, transitions)
 
-    states, alphabet, start_state, accept_states, transitions = load_dfa(input_file)
-
-    if mini:
-        n_s, n_a, n_st, n_acc, n_t = minimize_dfa(states, alphabet, start_state, accept_states, transitions)
-        write_dfa(output_file, n_s, n_a, n_st, n_acc, n_t)
-    else:
-        n_s, n_a, n_st, n_acc, n_t = simple_rename_dfa(states, alphabet, start_state, accept_states, transitions)
-        write_dfa(output_file, n_s, n_a, n_st, n_acc, n_t)
+        if args.output:
+            write_dfa(args.output, n_s, n_a, n_st, n_acc, n_t)
 
 
 if __name__ == "__main__":
