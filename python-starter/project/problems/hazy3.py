@@ -1,17 +1,4 @@
-import argparse
 import sys
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Automaton and DFA tool')
-    parser.add_argument('--input', type=str, help='Input file path')
-    parser.add_argument('--output', type=str, help='Output file path')
-    parser.add_argument('--mini', action='store_true', help='Flag to minimize the automaton')
-    parser.add_argument('--det', action='store_true', help='Flag to determinize the automaton')
-    parser.add_argument('--check', type=str, help='Check a word on the automaton')
-    parser.add_argument('--sum', action='store_true', help='Sum or combine automata')
-    parser.add_argument('--rgx', type=str, help='Regex related operation or file')
-    return parser.parse_args()
 
 
 def load_dfa(filepath):
@@ -185,21 +172,35 @@ def write_dfa(filepath, states, alphabet, start_state, accept_states, transition
 
 
 def main():
-    args = parse_args()
+    # Egyszerű manuális argumentumkezelés argparse nélkül (sys.argv alapú)
+    input_file = None
+    output_file = None
+    mini = False
 
-    # Ha van input file, betöltjük
-    states, alphabet, start_state, accept_states, transitions = [], [], "", [], []
-    if args.input:
-        states, alphabet, start_state, accept_states, transitions = load_dfa(args.input)
+    i = 1
+    while i < len(sys.argv):
+        arg = sys.argv[i]
+        if arg == '--input' and i + 1 < len(sys.argv):
+            input_file = sys.argv[i + 1]
+            i += 1
+        elif arg == '--output' and i + 1 < len(sys.argv):
+            output_file = sys.argv[i + 1]
+            i += 1
+        elif arg == '--mini':
+            mini = True
+        i += 1
 
-    # Művelet végrehajtása a kapott kapcsolók alapján
-    if args.mini and states:
+    if not input_file:
+        sys.exit(0)
+
+    states, alphabet, start_state, accept_states, transitions = load_dfa(input_file)
+
+    if mini:
         n_s, n_a, n_st, n_acc, n_t = minimize_dfa(states, alphabet, start_state, accept_states, transitions)
-        write_dfa(args.output, n_s, n_a, n_st, n_acc, n_t)
-    elif states:
-        # Alapértelmezett / átnevezéses ág
+        write_dfa(output_file, n_s, n_a, n_st, n_acc, n_t)
+    else:
         n_s, n_a, n_st, n_acc, n_t = simple_rename_dfa(states, alphabet, start_state, accept_states, transitions)
-        write_dfa(args.output, n_s, n_a, n_st, n_acc, n_t)
+        write_dfa(output_file, n_s, n_a, n_st, n_acc, n_t)
 
 
 if __name__ == "__main__":
