@@ -35,27 +35,29 @@ class RegexProblem(Problem):
                 f.write("\n".join(output_lines) + "\n")
 
     def _solve_task_1(self, lines: list[str]) -> list[str]:
+        # Alap logcat struktúra a feladat megjegyzése alapján:
+        # ^([0-9-]+ [0-9:.]+) +([0-9]+) +([0-9]+) ([IDVEFAW]) (.+?):(?: (.+))?$
         patterns = [
-            # 1. 10. hónap 15-én jött létre
-            re.compile(r"^10-15\b"),
-            # 2. 10. hónap 15-én 10 óra 18 perc és 51 másodperckor jött létre
+            # 1. az összes sort, amelyik 10. hónap 15-én jött létre
+            re.compile(r"^10-15 "),
+            # 2. az összes sort, amelyik 10. hónap 15-én 10 óra 18 perc és 51 másodperckor jött létre
             re.compile(r"^10-15 10:18:51\."),
-            # 3. 51 másodperckor jött létre (mindegy a perc)
-            re.compile(r"^\d{2}-\d{2} \d{2}:\d{2}:51\."),
-            # 4. összes lowmemorykiller taget tartalmazó sor
-            re.compile(r"^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+\d+\s+[IDVEFAW]\s+lowmemorykiller\s*:"),
-            # 5. összes 10:18:51-kor keletkező 221-es process id-jú sor
-            re.compile(r"^\d{2}-\d{2} 10:18:51\.\d+\s+221\s+"),
-            # 6. összes hibát tartalmazó sor (E)
-            re.compile(r"^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+\d+\s+E\s+"),
-            # 7. összes warning (W) amit a PackageManager küld
-            re.compile(r"^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+\d+\s+W\s+PackageManager\s*:"),
-            # 8. összes ExoPlayer-es debug (D) infó
-            re.compile(r"^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+\d+\s+D\s+ExoPlayer[^:]*:"),
-            # 9. összes java állomány pozíciót tartalmazó hiba és warning (E/W és .java:)
-            re.compile(r"^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+\d+\s+[EW]\s+.*?\b[\w$]+\.java:\d+"),
-            # 10. összes olyan sor, ami tartalmazza a Thread szót a message részben (nem a tagben)
-            re.compile(r"^\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+\s+\d+\s+\d+\s+[IDVEFAW]\s+[^:]+:\s*.*\bThread\b"),
+            # 3. az összes sort, amelyik 51 másodperckor jött létre (mindegy a perc)
+            re.compile(r"^[0-9-]+ [0-9]{2}:[0-9]{2}:51\."),
+            # 4. az összes lowmemorykiller taget tartalmazó sor
+            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ [IDVEFAW] lowmemorykiller:"),
+            # 5. az összes 10:18:51-kor keletkező 221-es process id-jú sort
+            re.compile(r"^[0-9-]+ 10:18:51\.[0-9]+ +221 +[0-9]+ [IDVEFAW] "),
+            # 6. az összes hibát tartalmazó sort (E)
+            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ E "),
+            # 7. az összes warningot (W) amit a PackageManager küld
+            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ W PackageManager:"),
+            # 8. az összes ExoPlayer-es debug (D) infót
+            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ D ExoPlayer:"),
+            # 9. az összes java állomány pozíciót tartalmazó hibát és warningot (EW .java:)
+            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ [EW] .+?\.java:"),
+            # 10. az összes olyan sort, ami tartalmazza a Thread szót a message részben (nem a tagben)
+            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ [IDVEFAW] .+?:\s+.*\bThread\b"),
         ]
         return [str(sum(1 for line in lines if p.search(line))) for p in patterns]
 
