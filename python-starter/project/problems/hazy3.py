@@ -1,211 +1,148 @@
-import argparse
+# python-starter/project/problems/hazi3.py
+import re
 import sys
 
-
-def parse_args():
-    parser = argparse.ArgumentParser(description='Automaton and Regex tool')
-    parser.add_argument('--input', type=str, help='Input file path')
-    parser.add_argument('--output', type=str, help='Output file path')
-    parser.add_argument('--mini', action='store_true', help='Flag to minimize the automaton')
-    parser.add_argument('--det', action='store_true', help='Flag to determinize the automaton')
-    parser.add_argument('--check', type=str, help='Check a word on the automaton')
-    parser.add_argument('--sum', action='store_true', help='Sum or combine automata')
-    parser.add_argument('--rgx', type=str, help='Regex related operation or problem number')
-    return parser.parse_args()
+from project.problem import Problem
 
 
-def load_dfa(filepath):
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            lines = [line.strip() for line in f if line.strip()]
-    except Exception as e:
-        print(f"Error reading input file: {e}")
-        sys.exit(1)
-
-    if len(lines) < 4:
-        print("Invalid input format.")
-        sys.exit(1)
-
-    states = lines[0].split()
-    alphabet = lines[1].split()
-    start_state = lines[2].strip()
-    accept_states = lines[3].split()
-
-    transitions = []
-    for line in lines[4:]:
-        parts = line.split()
-        if len(parts) != 3:
-            print(f"Invalid transition format: {line}")
-            sys.exit(1)
-        src, symbol, dest = parts
-
-        if src not in states or dest not in states:
-            print(f"Error: Transition state not in state list: {src} or {dest}")
-            sys.exit(1)
-        if symbol not in alphabet:
-            print(f"Error: Transition symbol not in alphabet: {symbol}")
-            sys.exit(1)
-
-        transitions.append((src, symbol, dest))
-
-    return states, alphabet, start_state, accept_states, transitions
+def natural_key(name):
+    """q2 < q10 természetes sorrend."""
+    return [int(t) if t.isdigit() else t for t in re.split(r'(\d+)', name)]
 
 
-def get_state_number(state_str):
-    digits = "".join([c for c in state_str if c.isdigit()])
-    return int(digits) if digits else 0
+def new_name(name):
+    """q1 -> s1"""
+    return 's' + name[1:] if name.startswith('q') else 's' + name
 
 
-def minimize_dfa(states, alphabet, start_state, accept_states, transitions):
-    trans_map = {}
-    for src, sym, dest in transitions:
-        trans_map[(src, sym)] = dest
+class Hazi3(Problem):
 
-    reachable = set([start_state])
-    queue = [start_state]
-    while queue:
-        curr = queue.pop(0)
-        for sym in alphabet:
-            if (curr, sym) in trans_map:
-                dest = trans_map[(curr, sym)]
-                if dest not in reachable:
-                    reachable.add(dest)
-                    queue.append(dest)
+    def initialize_parser(self, parser):
+        parser.add_argument('--mini', action='store_true',
+                            help='determinisztikus automata minimalizálása')
 
-    states = [s for s in states if s in reachable]
-    accept_states = set([s for s in accept_states if s in reachable])
+    def is_chosen_problem(self, args):
+        return bool(getattr(args, 'mini', False))
 
-    if start_state not in reachable:
-        reachable.add(start_state)
+    def run(self, args):
+        try:
+            automaton = self.read_automaton(args.input)
+        except ValueError as e:
+            print(f"Hiba: {e}", file=sys.stderr)
+            raise SystemExit(1)
 
-    P = [accept_states, set(states) - accept_states]
-    P = [p for p in P if p]
+        result = self.minimize(*automaton)
 
-    W = list(P)
+        with open(args.output, 'w', encoding='utf-8') as f:
+            f.write("\n".join(result) + "\n")
 
-    while W:
-        A = W.pop(0)
-        for sym in alphabet:
-            X = set([s for s in states if trans_map.get((s, sym)) in A])
+    # ---------- beolvasás ----------
 
-            new_P = []
-            for Y in P:
-                intersection = Y.intersection(X)
-                difference = Y.difference(X)
+    @staticmethod
+    def read_automaton(path):
+        with open(path, encoding='utf-8') as f:
+            lines = [l.strip() for l in f.read().splitlines()]
 
-                if intersection and difference:
-                    new_P.append(intersection)
-                    new_P.append(difference)
-                    if Y in W:
-                        W.remove(Y)
-                        W.append(intersection)
-                        W.append(difference)
-                    else:
-                        if len(intersection) <= len(difference):
-                            W.append(intersection)
-                        else:
-                            W.append(difference)
-                else:
-                    new_P.append(Y)
-            P = new_P
+        if len(lines) < 3:
+            raise ValueError("hiányos bemeneti fájl")
 
-    state_mapping = {}
-    for group in P:
-        sorted_group = sorted(list(group), key=get_state_number)
-        representative = sorted_group[0]
-        new_name = 's' + str(get_state_number(representative))
-        for state in group:
-            state_mapping[state] = new_name
+        states = lines[0].split()
+        alphabet = lines[1].split()
+        start_tokens = lines[2].split()
+        if len(start_tokens) != 1:
+            raise ValueError("pontosan egy kezdőállapot szükséges")
+        start = start_tokens[0]
+        finals = lines[3].split() if len(lines) > 3 else []
 
-    new_states = sorted(list(set(state_mapping.values())), key=get_state_number)
-    new_start_state = state_mapping[start_state]
-    new_accept_states = sorted(list(set([state_mapping[s] for s in accept_states if s in state_mapping])),
-                               key=get_state_number)
+        state_set = set(states)
+        symbol_set = set(alphabet)
 
-    new_transitions = set()
-    for src, sym, dest in transitions:
-        if src in state_mapping and dest in state_mapping:
-            new_transitions.add((state_mapping[src], sym, state_mapping[dest]))
+        if start not in state_set:
+            raise ValueError(f"ismeretlen kezdőállapot: {start}")
+        for q in finals:
+            if q not in state_set:
+                raise ValueError(f"ismeretlen végállapot: {q}")
 
-    sorted_transitions = sorted(
-        list(new_transitions),
-        key=lambda x: (get_state_number(x[0]), x[1], get_state_number(x[2]))
-    )
+        delta = {}
+        for line in lines[4:]:
+            if not line:
+                continue
+            parts = line.replace(',', ' ').split()
+            if len(parts) != 3:
+                raise ValueError(f"hibás átmenet: {line}")
+            src, sym, dst = parts
+            if src not in state_set or dst not in state_set:
+                raise ValueError(f"ismeretlen állapot az átmenetben: {line}")
+            if sym not in symbol_set:
+                raise ValueError(f"ismeretlen jel az átmenetben: {line}")
+            if (src, sym) in delta and delta[(src, sym)] != dst:
+                raise ValueError(f"nem determinisztikus átmenet: {line}")
+            delta[(src, sym)] = dst
 
-    return new_states, alphabet, new_start_state, new_accept_states, sorted_transitions
+        return states, alphabet, start, finals, delta
 
+    # ---------- minimalizálás ----------
 
-def simple_rename_dfa(states, alphabet, start_state, accept_states, transitions):
-    def rename(s):
-        return 's' + str(get_state_number(s))
+    @staticmethod
+    def minimize(states, alphabet, start, finals, delta):
+        symbols = sorted(alphabet)
+        final_set = set(finals)
 
-    reachable = set([start_state])
-    queue = [start_state]
-    trans_map = {(src, sym): dest for src, sym, dest in transitions}
-    while queue:
-        curr = queue.pop(0)
-        for sym in alphabet:
-            if (curr, sym) in trans_map:
-                dest = trans_map[(curr, sym)]
-                if dest not in reachable:
-                    reachable.add(dest)
-                    queue.append(dest)
+        # elérhetetlen állapotok elhagyása
+        reachable = {start}
+        stack = [start]
+        while stack:
+            q = stack.pop()
+            for a in symbols:
+                t = delta.get((q, a))
+                if t is not None and t not in reachable:
+                    reachable.add(t)
+                    stack.append(t)
+        states = [q for q in states if q in reachable]
 
-    states = [s for s in states if s in reachable]
-    accept_states = set([s for s in accept_states if s in reachable])
+        # partíciófinomítás (hiányzó átmenet = -1 osztály)
+        cls = {q: (1 if q in final_set else 0) for q in states}
+        while True:
+            sigs = {}
+            new_cls = {}
+            for q in states:
+                sig = (cls[q],) + tuple(
+                    cls[delta[(q, a)]] if (q, a) in delta else -1
+                    for a in symbols)
+                new_cls[q] = sigs.setdefault(sig, len(sigs))
+            if len(set(new_cls.values())) == len(set(cls.values())):
+                cls = new_cls
+                break
+            cls = new_cls
 
-    new_states = sorted(list(set([rename(s) for s in states])), key=get_state_number)
-    new_start_state = rename(start_state)
-    new_accept_states = sorted(list(set([rename(s) for s in accept_states])), key=get_state_number)
+        # osztályok legkisebb nevű képviselővel
+        groups = {}
+        for q in states:
+            groups.setdefault(cls[q], []).append(q)
+        rep = {}
+        for members in groups.values():
+            smallest = min(members, key=natural_key)
+            for q in members:
+                rep[q] = new_name(smallest)
 
-    new_transitions = set()
-    for src, sym, dest in transitions:
-        if src in reachable and dest in reachable:
-            new_transitions.add((rename(src), sym, rename(dest)))
+        new_states = sorted(set(rep.values()), key=natural_key)
+        new_start = rep[start]
+        new_finals = sorted({rep[q] for q in states if q in final_set},
+                            key=natural_key)
 
-    sorted_transitions = sorted(
-        list(new_transitions),
-        key=lambda x: (get_state_number(x[0]), x[1], get_state_number(x[2]))
-    )
-    return new_states, alphabet, new_start_state, new_accept_states, sorted_transitions
+        transitions = set()
+        for (src, sym), dst in delta.items():
+            if src in rep and dst in rep:
+                transitions.add((rep[src], sym, rep[dst]))
+        transitions = sorted(
+            transitions,
+            key=lambda t: (natural_key(t[0]), t[1], natural_key(t[2])))
 
-
-def write_dfa(filepath, states, alphabet, start_state, accept_states, transitions):
-    if not filepath:
-        return
-    with open(filepath, 'w', encoding='utf-8') as f:
-        f.write(" ".join(states) + "\n")
-        f.write(" ".join(alphabet) + "\n")
-        f.write(start_state + "\n")
-        f.write(" ".join(accept_states) + "\n")
-        for src, sym, dest in transitions:
-            f.write(f"{src} {sym} {dest}\n")
-
-
-def main():
-    args = parse_args()
-
-    # Ha regex (--rgx) vagy más speciális feladat fut
-    if args.rgx is not None:
-        # Ha a regex tesztekhez is kell output vagy input feldolgozás:
-        if args.input:
-            states, alphabet, start_state, accept_states, transitions = load_dfa(args.input)
-            n_s, n_a, n_st, n_acc, n_t = simple_rename_dfa(states, alphabet, start_state, accept_states, transitions)
-            if args.output:
-                write_dfa(args.output, n_s, n_a, n_st, n_acc, n_t)
-        return
-
-    # Normál DFA / Minimalizálás ág
-    if args.input:
-        states, alphabet, start_state, accept_states, transitions = load_dfa(args.input)
-        if args.mini:
-            n_s, n_a, n_st, n_acc, n_t = minimize_dfa(states, alphabet, start_state, accept_states, transitions)
-        else:
-            n_s, n_a, n_st, n_acc, n_t = simple_rename_dfa(states, alphabet, start_state, accept_states, transitions)
-
-        if args.output:
-            write_dfa(args.output, n_s, n_a, n_st, n_acc, n_t)
-
-
-if __name__ == "__main__":
-    main()
+        out = [
+            " ".join(new_states),
+            " ".join(alphabet),
+            new_start,
+            " ".join(new_finals),
+        ]
+        out.extend(f"{s} {a} {d}" for s, a, d in transitions)
+        return out
