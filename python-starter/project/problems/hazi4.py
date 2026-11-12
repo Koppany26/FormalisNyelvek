@@ -1,105 +1,117 @@
+# python-starter/project/problems/hazi4.py
 import re
 from collections import Counter
+
 from project.problem import Problem
 
+# A feladatban megadott kifejezés (csoportok: 1 teljes, 2 időbélyeg, 3 pid, 4 tid, 5 szint, 6 tag, 7 üzenet)
+LINE_RE = re.compile(r"(([0-9-]+ [0-9:.]+) +([0-9]+) +([0-9]+) ([IDVEFAW]) (.+?):(?: (.+))?)")
+JAVA_FILE_RE = re.compile(r"([\w$-]+\.java)(?=:\d+)")
 
-class RegexProblem(Problem):
+# 1. feladat alpontjai (nyers sorokra)
+RE_DATE = re.compile(r"^10-15 ")
+RE_DATETIME = re.compile(r"^10-15 10:18:51\.")
+RE_SECOND = re.compile(r"^\S+ \d\d:\d\d:51\.")
+RE_LMK = re.compile(r"^\S+ \S+ +\d+ +\d+ [IDVEFAW] lowmemorykiller:")
+RE_PID221 = re.compile(r"^\S+ 10:18:51\.\d+ +221 +\d+ ")
+RE_ERROR = re.compile(r"^\S+ \S+ +\d+ +\d+ E ")
+RE_PKGMAN_W = re.compile(r"^\S+ \S+ +\d+ +\d+ W PackageManager:")
+RE_EXO_D = re.compile(r"^\S+ \S+ +\d+ +\d+ D ExoPlayer\S*:")
+RE_JAVA_EW = re.compile(r"^\S+ \S+ +\d+ +\d+ [EW] .*\.java:")
+RE_THREAD_MSG = re.compile(r"Thread")
+
+
+class Hazi4(Problem):
 
     def initialize_parser(self, parser):
-        parser.add_argument(
-            "--rgx",
-            type=int,
-            choices=[1, 2, 3, 4, 5],
-            help="Regex task number (1-5)",
-        )
+        parser.add_argument('--rgx', type=int, default=None,
+                            help='regex feladat sorszáma (1-5)')
 
     def is_chosen_problem(self, args):
-        return args.rgx is not None
+        return getattr(args, 'rgx', None) is not None
 
     def run(self, args):
-        with open(args.input, "r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-
-        solvers = {
-            1: self._solve_task_1,
-            2: self._solve_task_2,
-            3: self._solve_task_3,
-            4: self._solve_task_4,
-            5: self._solve_task_5,
+        tasks = {
+            1: self.task1,
+            2: self.task2,
+            3: self.task3,
+            4: self.task4,
+            5: self.task5,
         }
+        if args.rgx not in tasks:
+            raise SystemExit(f"Ismeretlen feladat: {args.rgx}")
 
-        output_lines = solvers[args.rgx](lines)
+        lines = self.read_lines(args.input)
+        result = tasks[args.rgx](lines)
 
-        with open(args.output, "w", encoding="utf-8") as f:
-            if output_lines:
-                f.write("\n".join(output_lines) + "\n")
+        with open(args.output, 'w', encoding='utf-8') as f:
+            f.write("\n".join(result) + ("\n" if result else ""))
 
-    def _solve_task_1(self, lines: list[str]) -> list[str]:
-        # Alap logcat struktúra a feladat megjegyzése alapján:
-        # ^([0-9-]+ [0-9:.]+) +([0-9]+) +([0-9]+) ([IDVEFAW]) (.+?):(?: (.+))?$
-        patterns = [
-            # 1. az összes sort, amelyik 10. hónap 15-én jött létre
-            re.compile(r"^10-15 "),
-            # 2. az összes sort, amelyik 10. hónap 15-én 10 óra 18 perc és 51 másodperckor jött létre
-            re.compile(r"^10-15 10:18:51\."),
-            # 3. az összes sort, amelyik 51 másodperckor jött létre (mindegy a perc)
-            re.compile(r"^[0-9-]+ [0-9]{2}:[0-9]{2}:51\."),
-            # 4. az összes lowmemorykiller taget tartalmazó sor
-            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ [IDVEFAW] lowmemorykiller:"),
-            # 5. az összes 10:18:51-kor keletkező 221-es process id-jú sort
-            re.compile(r"^[0-9-]+ 10:18:51\.[0-9]+ +221 +[0-9]+ [IDVEFAW] "),
-            # 6. az összes hibát tartalmazó sort (E)
-            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ E "),
-            # 7. az összes warningot (W) amit a PackageManager küld
-            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ W PackageManager:"),
-            # 8. az összes ExoPlayer-es debug (D) infót
-            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ D ExoPlayer:"),
-            # 9. az összes java állomány pozíciót tartalmazó hibát és warningot (EW .java:)
-            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ [EW] .+?\.java:"),
-            # 10. az összes olyan sort, ami tartalmazza a Thread szót a message részben (nem a tagben)
-            re.compile(r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ [IDVEFAW] .+?:\s+.*\bThread\b"),
-        ]
-        return [str(sum(1 for line in lines if p.search(line))) for p in patterns]
+    # ---------- segédfüggvények ----------
 
-    def _solve_task_2(self, lines: list[str]) -> list[str]:
-        pattern = re.compile(
-            r"^[0-9-]+ [0-9:.]+ +[0-9]+ +[0-9]+ E .+?:\s*.*\(([A-Za-z0-9_$]+\.java):[0-9]+\)"
-        )
-        results = []
+    @staticmethod
+    def read_lines(path):
+        with open(path, encoding='utf-8', errors='replace') as f:
+            return [l.rstrip("\r\n") for l in f]
+
+    @staticmethod
+    def parse(lines):
         for line in lines:
-            match = pattern.search(line)
-            if match:
-                results.append(match.group(1))
-        return results
+            m = LINE_RE.match(line)
+            if m:
+                yield m
 
-    def _solve_task_3(self, lines: list[str]) -> list[str]:
-        pattern = re.compile(r"^[0-9-]+ [0-9:.]+ +([0-9]+) +[0-9]+ [IDVEFAW] ")
-        seen = set()
-        results = []
+    # ---------- feladatok ----------
+
+    def task1(self, lines):
+        counts = [0] * 10
         for line in lines:
-            match = pattern.search(line)
-            if match:
-                pid = match.group(1)
-                if pid not in seen:
-                    seen.add(pid)
-                    results.append(pid)
-        return results
+            if RE_DATE.search(line):
+                counts[0] += 1
+            if RE_DATETIME.search(line):
+                counts[1] += 1
+            if RE_SECOND.search(line):
+                counts[2] += 1
+            if RE_LMK.search(line):
+                counts[3] += 1
+            if RE_PID221.search(line):
+                counts[4] += 1
+            if RE_ERROR.search(line):
+                counts[5] += 1
+            if RE_PKGMAN_W.search(line):
+                counts[6] += 1
+            if RE_EXO_D.search(line):
+                counts[7] += 1
+            if RE_JAVA_EW.search(line):
+                counts[8] += 1
+            m = LINE_RE.match(line)
+            if m and m.group(7) and RE_THREAD_MSG.search(m.group(7)):
+                counts[9] += 1
+        return [str(c) for c in counts]
 
-    def _solve_task_4(self, lines: list[str]) -> list[str]:
-        pattern = re.compile(r"^[0-9-]+ [0-9:.]+ +([0-9]+) +[0-9]+ E ")
-        error_counts = Counter()
-        for line in lines:
-            match = pattern.search(line)
-            if match:
-                error_counts[match.group(1)] += 1
+    def task2(self, lines):
+        out = []
+        for m in self.parse(lines):
+            if m.group(5) == "E" and m.group(7):
+                out.extend(JAVA_FILE_RE.findall(m.group(7)))
+        return out
 
-        if not error_counts:
-            return ["PID=None (0 errors)"]
+    def task3(self, lines):
+        seen = []
+        for m in self.parse(lines):
+            pid = m.group(3)
+            if pid not in seen:
+                seen.append(pid)
+        return seen
 
-        top_pid, count = error_counts.most_common(1)[0]
-        return [f"PID={top_pid} ({count} errors)"]
+    def task4(self, lines):
+        c = Counter(m.group(3) for m in self.parse(lines) if m.group(5) == "E")
+        if not c:
+            return []
+        pid, n = c.most_common(1)[0]  # döntetlennél az először előforduló
+        return [f"PID={pid} ({n} errors)"]
 
-    def _solve_task_5(self, lines: list[str]) -> list[str]:
-        pattern = re.compile(r"^[0-9-]+ [0-9:.]+ +([0-9]+) +\1 E ")
-        count = sum(1 for line in lines if pattern.search(line))
-        return [str(count)]
+    def task5(self, lines):
+        n = sum(1 for m in self.parse(lines)
+                if m.group(5) == "E" and m.group(3) == m.group(4))
+        return [str(n)]
