@@ -15,7 +15,7 @@ RE_SECOND = re.compile(r"^\S+ \d\d:\d\d:51\.")        # bármely perc, 51 mp
 RE_TIME_221 = re.compile(r"^\S+ 10:18:51\.")          # 10:18:51 (pid külön)
 RE_TAG_LMK = re.compile(r"\s*lowmemorykiller\s*$")
 RE_TAG_PKGMAN = re.compile(r"\s*PackageManager\s*$")
-RE_TAG_EXO = re.compile(r"\s*ExoPlayer\w*\s*$")       # ha csak a pontos tag kell: r"\s*ExoPlayer\s*$"
+RE_EXO = re.compile(r"ExoPlayer")                     # a teljes D sorban keresünk
 RE_JAVA = re.compile(r"\.java:")
 RE_THREAD_MSG = re.compile(r"Thread")
 
@@ -82,7 +82,7 @@ class Hazi4(Problem):
                 counts[5] += 1
             if level == "W" and RE_TAG_PKGMAN.fullmatch(tag):
                 counts[6] += 1
-            if level == "D" and RE_TAG_EXO.fullmatch(tag):
+            if level == "D" and RE_EXO.search(full):
                 counts[7] += 1
             if level in ("E", "W") and RE_JAVA.search(full):
                 counts[8] += 1
