@@ -4,20 +4,19 @@ from collections import Counter
 
 from project.problem import Problem
 
-# A feladatban megadott kifejezés (csoportok: 1 teljes, 2 időbélyeg, 3 pid, 4 tid, 5 szint, 6 tag, 7 üzenet)
+# Csoportok: 1 teljes, 2 időbélyeg, 3 pid, 4 tid, 5 szint, 6 tag, 7 üzenet
 LINE_RE = re.compile(r"(([0-9-]+ [0-9:.]+) +([0-9]+) +([0-9]+) ([IDVEFAW]) (.+?):(?: (.+))?)")
 JAVA_FILE_RE = re.compile(r"([\w$-]+\.java)(?=:\d+)")
 
-# 1. feladat alpontjai (nyers sorokra)
-RE_DATE = re.compile(r"^10-15 ")
-RE_DATETIME = re.compile(r"^10-15 10:18:51\.")
-RE_SECOND = re.compile(r"^\S+ \d\d:\d\d:51\.")
-RE_PID221 = re.compile(r"^\S+ 10:18:51\.\d+ +221 +\d+ ")
-RE_ERROR = re.compile(r"^\S+ \S+ +\d+ +\d+ E ")
-RE_LMK = re.compile(r"^\S+ \S+ +\d+ +\d+ [IDVEFAW] lowmemorykiller\s*:")
-RE_PKGMAN_W = re.compile(r"^\S+ \S+ +\d+ +\d+ W PackageManager\s*:")
-RE_EXO_D = re.compile(r"^\S+ \S+ +\d+ +\d+ D ExoPlayer\S*\s*:")
-RE_JAVA_EW = re.compile(r"^\S+ \S+ +\d+ +\d+ [EW] .*\.java:")
+# 1. feladat mintái
+RE_DATE = re.compile(r"^10-15 ")                      # időbélyeg: 10. hó 15.
+RE_DATETIME = re.compile(r"^10-15 10:18:51\.")        # 10-15 10:18:51
+RE_SECOND = re.compile(r"^\S+ \d\d:\d\d:51\.")        # bármely perc, 51 mp
+RE_TIME_221 = re.compile(r"^\S+ 10:18:51\.")          # 10:18:51 (pid külön)
+RE_TAG_LMK = re.compile(r"\s*lowmemorykiller\s*$")
+RE_TAG_PKGMAN = re.compile(r"\s*PackageManager\s*$")
+RE_TAG_EXO = re.compile(r"\s*ExoPlayer\w*\s*$")       # ha csak a pontos tag kell: r"\s*ExoPlayer\s*$"
+RE_JAVA = re.compile(r"\.java:")
 RE_THREAD_MSG = re.compile(r"Thread")
 
 
@@ -65,27 +64,29 @@ class Hazi4(Problem):
 
     def task1(self, lines):
         counts = [0] * 10
-        for line in lines:
-            if RE_DATE.search(line):
+        for m in self.parse(lines):
+            ts, pid, level, tag, msg = m.group(2), m.group(3), m.group(5), m.group(6), m.group(7)
+            full = m.group(1)
+
+            if RE_DATE.search(ts):
                 counts[0] += 1
-            if RE_DATETIME.search(line):
+            if RE_DATETIME.search(ts):
                 counts[1] += 1
-            if RE_SECOND.search(line):
+            if RE_SECOND.search(ts):
                 counts[2] += 1
-            if RE_LMK.search(line):
+            if RE_TAG_LMK.fullmatch(tag):
                 counts[3] += 1
-            if RE_PID221.search(line):
+            if RE_TIME_221.search(ts) and pid == "221":
                 counts[4] += 1
-            if RE_ERROR.search(line):
+            if level == "E":
                 counts[5] += 1
-            if RE_PKGMAN_W.search(line):
+            if level == "W" and RE_TAG_PKGMAN.fullmatch(tag):
                 counts[6] += 1
-            if RE_EXO_D.search(line):
+            if level == "D" and RE_TAG_EXO.fullmatch(tag):
                 counts[7] += 1
-            if RE_JAVA_EW.search(line):
+            if level in ("E", "W") and RE_JAVA.search(full):
                 counts[8] += 1
-            m = LINE_RE.match(line)
-            if m and m.group(7) and RE_THREAD_MSG.search(m.group(7)):
+            if msg and RE_THREAD_MSG.search(msg):
                 counts[9] += 1
         return [str(c) for c in counts]
 
